@@ -89,8 +89,6 @@ NSComparisonResult sortParameterKeys(NSString* string1, NSString* string2, void 
   [self setApiKey:anApiKey];
   [self setApiSecret:anApiSecret];
 
-  LTRtmApiInstance = self;
-
   return self;
 }
 

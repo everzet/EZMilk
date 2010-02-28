@@ -190,7 +190,7 @@ NSComparisonResult sortParameterKeys(NSString* string1, NSString* string2, void 
 
 - (BOOL)noErrorsInResponse:(NSDictionary*)anResponse
 {
-  return ([[anResponse objectForKey:@"stat"] compare:@"ok"] == NSOrderedSame);
+  return (NSOrderedSame == [[anResponse objectForKey:@"stat"] localizedCaseInsensitiveCompare:@"ok"]);
 }
 
 - (NSString*)errorMsgInResponse:(NSDictionary*)anResponse

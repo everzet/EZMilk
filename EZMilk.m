@@ -26,8 +26,6 @@
 
 #import "EZMilk.h"
 
-static EZMilk* LTRtmApiInstance;
-
 NSString* md5(NSString *str)
 {
   const char *cStr = [str UTF8String];
@@ -75,11 +73,6 @@ NSComparisonResult sortParameterKeys(NSString* string1, NSString* string2, void 
 @synthesize apiSecret;
 @synthesize token;
 @synthesize lastApiCall;
-
-+ (EZMilk*)instance
-{
-  return LTRtmApiInstance;
-}
 
 - (id)init
 {

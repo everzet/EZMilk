@@ -41,8 +41,6 @@
 @property (retain) NSString* token;
 @property (retain) NSDate* lastApiCall;
 
-+ (EZMilk*)instance;
-
 // Initializators
 - (id)initWithApiKey:(NSString*)anApiKey andApiSecret:(NSString*)anApiSecret;
 

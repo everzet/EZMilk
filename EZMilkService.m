@@ -24,7 +24,16 @@
  
  */
 
-#import "EZMilk.h"
+#import "EZMilkService.h"
+
+#define EZM_API_KEY   @"api_key"
+#define EZM_PERMS     @"perms"
+#define EZM_FROB      @"frob"
+#define EZM_TOKEN     @"token"
+#define EZM_AUTH      @"auth"
+#define EZM_TIMELINE  @"timeline"
+
+static EZMilkService* sharedEZMilkService = nil;
 
 NSString* md5(NSString *str)
 {
@@ -67,39 +76,118 @@ NSComparisonResult sortParameterKeys(NSString* string1, NSString* string2, void 
   return sortParameterKeysByChars(string1, string2, 0);
 }
 
-@implementation EZMilk
+@implementation EZMilkService
 
-@synthesize apiKey;
-@synthesize apiSecret;
-@synthesize token;
-@synthesize lastApiCall;
-
-- (id)init
-{
-  return [self initWithApiKey:@"" andApiSecret:@""];
-}
+@synthesize apiKey, apiSecret, lastApiCall, token, timeline;
 
 - (id)initWithApiKey:(NSString*)anApiKey andApiSecret:(NSString*)anApiSecret
+{
+  [self setApiKey:anApiKey];
+  [self setApiSecret:anApiSecret];
+
+  return [self init];
+}
+
+- (id)init
 {
   if (!(self = [super init]))
   {
     return nil;
   }
-
-  [self setApiKey:anApiKey];
-  [self setApiSecret:anApiSecret];
+  sharedEZMilkService = self;
 
   return self;
 }
 
++ (EZMilkService*)sharedService
+{
+	return sharedEZMilkService;
+}
+
 - (void)dealloc
 {
+  [timeline release];
+  [token release];
   [apiKey release];
   [apiSecret release];
-  [token release];
   [lastApiCall release];
-
+  
   [super dealloc];
+}
+
+- (NSString*)timeline
+{
+  if (!timeline)
+  {
+    [self getTimeline];
+  }
+
+  return timeline;
+}
+
+- (void)getTimeline
+{
+  NSError* error = nil;
+  NSDictionary* response = [self dataByCallingMethod:@"rtm.timelines.create" error:&error];
+
+  if (nil != response)
+  {
+    [self setTimeline:[[response objectForKey:EZM_TIMELINE] retain]];
+  }
+  else
+  {
+    [NSApp presentError:error];
+
+    return;
+  }
+}
+
+- (NSString*)frob
+{
+  NSError* error = nil;
+  NSDictionary* response = [self dataByCallingMethod:@"rtm.auth.getFrob" andParameters:[NSDictionary dictionary] error:&error];
+  
+  if (nil != response)
+  {
+    return [response objectForKey:EZM_FROB];
+  }
+  else
+  {
+    [NSApp presentError:error];
+    
+    return nil;
+  }
+}
+
+- (NSString*)tokenWithFrob:(NSString*)aFrob
+{
+  NSError* error = nil;
+  NSDictionary* parameters = [NSDictionary dictionaryWithObjectsAndKeys:
+                              aFrob, EZM_FROB, nil];
+  NSDictionary* response = [self dataByCallingMethod:@"rtm.auth.getToken" andParameters:parameters error:&error];
+  
+  if (nil != response)
+  {
+    return [[response objectForKey:EZM_AUTH] objectForKey:EZM_TOKEN];
+  }
+  else
+  {
+    [NSApp presentError:error];
+
+    return nil;
+  }
+}
+
+- (NSString*)authUrlForPerms:(NSString*)aPerms withFrob:(NSString*)aFrob
+{
+  NSDictionary* parameters = [NSDictionary dictionaryWithObjectsAndKeys:
+                              apiKey, EZM_API_KEY,
+                              aPerms, EZM_PERMS,
+                              aFrob,  EZM_FROB, nil];
+  NSString* parametersString = [self urlParametersWithDictionary:parameters];
+  
+  return [NSString stringWithFormat:@"http://www.rememberthemilk.com/services/auth/?%@api_sig=%@",
+          parametersString, [self apiSigFromParameters:parameters]];
 }
 
 + (NSString*)rtmDateFromDate:(NSDate*)aDate
@@ -124,61 +212,6 @@ NSComparisonResult sortParameterKeys(NSString* string1, NSString* string2, void 
   return date;
 }
 
-- (NSString*)timeline
-{
-  NSDictionary* response = [self dataByCallingMethod:@"rtm.timelines.create" andParameters:[NSDictionary dictionary] withToken:YES];
-
-  if ([self noErrorsInResponse:response])
-  {
-    return [response objectForKey:@"timeline"];
-  }
-  else
-  {
-    return [self errorWithResponse:response];
-  }
-}
-
-- (NSString*)frob
-{
-  NSDictionary* response = [self dataByCallingMethod:@"rtm.auth.getFrob" andParameters:[NSDictionary dictionary]];
-
-  if ([self noErrorsInResponse:response])
-  {
-    return [response objectForKey:@"frob"];
-  }
-  else
-  {
-    return [self errorWithResponse:response];
-  }
-}
-
-- (NSString*)authUrlForPerms:(NSString*)aPerms withFrob:(NSString*)aFrob
-{
-  NSDictionary* parameters = [NSDictionary dictionaryWithObjectsAndKeys:
-                              apiKey, @"api_key",
-                              aPerms, @"perms",
-                              aFrob, @"frob", nil];
-  NSString* parametersString = [self urlParametersWithDictionary:parameters];
-
-  return [NSString stringWithFormat:@"http://www.rememberthemilk.com/services/auth/?%@api_sig=%@",
-          parametersString, [self apiSigFromParameters:parameters]];
-}
-
-- (NSString*)tokenWithFrob:(NSString*)aFrob
-{
-  NSDictionary* parameters = [NSDictionary dictionaryWithObjectsAndKeys:aFrob, @"frob", nil];
-  NSDictionary* response = [self dataByCallingMethod:@"rtm.auth.getToken" andParameters:parameters];
-
-  if ([self noErrorsInResponse:response])
-  {
-    return [[response objectForKey:@"auth"] objectForKey:@"token"];
-  }
-  else
-  {
-    return [self errorWithResponse:response];
-  }
-}
-
 - (BOOL)noErrorsInResponse:(NSDictionary*)anResponse
 {
   return (NSOrderedSame == [[anResponse objectForKey:@"stat"] localizedCaseInsensitiveCompare:@"ok"]);
@@ -189,19 +222,17 @@ NSComparisonResult sortParameterKeys(NSString* string1, NSString* string2, void 
   return [[anResponse objectForKey:@"err"] objectForKey:@"msg"];
 }
 
-- (id)errorWithResponse:(NSDictionary*)anResponse
+- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod error:(NSError**)error
 {
-  NSLog(@"error: %@", [self errorMsgInResponse:anResponse]);
-
-  return nil;
+  return [self dataByCallingMethod:aMethod andParameters:nil withToken:YES error:error];
 }
 
-- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters
+- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters error:(NSError**)error
 {
-  return [self dataByCallingMethod:aMethod andParameters:aParameters withToken:NO];
+  return [self dataByCallingMethod:aMethod andParameters:aParameters withToken:YES error:error];
 }
 
-- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters withToken:(BOOL)useToken
+- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters withToken:(BOOL)useToken error:(NSError**)error
 {
   // Checking that last API call was made more than a second ago & if not - waiting for a second (RTM recomendations)
   if (lastApiCall && (([lastApiCall timeIntervalSinceNow] * -1.0) < 1.0))
@@ -213,7 +244,19 @@ NSComparisonResult sortParameterKeys(NSString* string1, NSString* string2, void 
   NSString* response = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:nil];
   [self setLastApiCall:[NSDate date]];
 
-  return [[response JSONValue] objectForKey:@"rsp"];
+  NSDictionary* data = [[response JSONValue] objectForKey:@"rsp"];
+
+  if (![self noErrorsInResponse:data])
+  {
+    NSDictionary* errorDetail = [NSDictionary dictionaryWithObjectsAndKeys:
+                                 [NSString stringWithFormat:@"RTM API Error:\n%@", [self errorMsgInResponse:data]], NSLocalizedDescriptionKey,
+                                 nil];
+    *error = [NSError errorWithDomain:@"EZMilk" code:100 userInfo:errorDetail];
+
+    return nil;
+  }
+
+  return data;
 }
 
 - (NSString*)urlParametersWithDictionary:(NSDictionary*)aParameters
@@ -230,26 +273,35 @@ NSComparisonResult sortParameterKeys(NSString* string1, NSString* string2, void 
   return [NSString stringWithString:parametersString];
 }
 
+- (NSString*)urlStringWithMethod:(NSString*)aMethod
+{
+  return [self urlStringWithMethod:aMethod andParameters:nil withToken:YES];
+}
+
 - (NSString*)urlStringWithMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters
 {
-  return [self urlStringWithMethod:aMethod andParameters:aParameters withToken:NO];
+  return [self urlStringWithMethod:aMethod andParameters:aParameters withToken:YES];
 }
 
 - (NSString*)urlStringWithMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters withToken:(BOOL)useToken
 {
-  NSMutableDictionary* parameters = [[aParameters mutableCopy] autorelease];
+  NSMutableDictionary* parameters;
+  parameters = (nil != aParameters) ? [[aParameters mutableCopy] autorelease] : [NSMutableDictionary dictionary];
+
   [parameters setObject:apiKey forKey:@"api_key"];
   [parameters setObject:aMethod forKey:@"method"];
   [parameters setObject:@"json" forKey:@"format"];
   [parameters setObject:[NSString stringWithFormat:@"%d", [NSDate timeIntervalSinceReferenceDate]] forKey:@"nocache"];
-  if (useToken)
+
+  if (useToken && nil != token)
   {
     [parameters setObject:token forKey:@"auth_token"];
   }
+
   NSString* parametersString = [self urlParametersWithDictionary:parameters];
   NSString* signedParameters = [self apiSigFromParameters:parameters];
   NSString* url = [[NSString stringWithFormat:@"http://api.rememberthemilk.com/services/rest/?%@api_sig=%@",
-                    parametersString, signedParameters] stringByAddingPercentEscapesUsingEncoding:NSASCIIStringEncoding];
+                    parametersString, signedParameters] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
   NSLog(@"RTM URL: %@", url);
 
   return url;

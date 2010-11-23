@@ -29,43 +29,45 @@
 #import "JSON.h"
 
 
-@interface EZMilk : NSObject {
+@interface EZMilkService : NSObject {
+  NSString* token;
+  NSString* timeline;
   NSString* apiKey;
   NSString* apiSecret;
-  NSString* token;
-  NSDate* lastApiCall;
+  NSDate*   lastApiCall;
 }
 
+@property (retain) NSString* token;
+@property (retain) NSString* timeline;
 @property (retain) NSString* apiKey;
 @property (retain) NSString* apiSecret;
-@property (retain) NSString* token;
-@property (retain) NSDate* lastApiCall;
+@property (retain) NSDate*   lastApiCall;
 
 // Initializators
 - (id)initWithApiKey:(NSString*)anApiKey andApiSecret:(NSString*)anApiSecret;
++ (EZMilkService*)sharedService;
+
+// Authorization & helpers
+- (NSString*)frob;
+- (NSString*)authUrlForPerms:(NSString*)aPerms withFrob:(NSString*)aFrob;
+- (NSString*)tokenWithFrob:(NSString*)aFrob;
+- (void)getTimeline;
 
 // Helpers
 + (NSString*)rtmDateFromDate:(NSDate*)aDate;
 + (NSDate*)dateFromRtmDate:(NSString*)anSqlDate;
 
-// Authorization
-- (NSString*)frob;
-- (NSString*)authUrlForPerms:(NSString*)aPerms withFrob:(NSString*)aFrob;
-- (NSString*)tokenWithFrob:(NSString*)aFrob;
-
-// Often methods
-- (NSString*)timeline;
-
 // Response error checking
 - (BOOL)noErrorsInResponse:(NSDictionary*)anResponse;
 - (NSString*)errorMsgInResponse:(NSDictionary*)anResponse;
-- (id)errorWithResponse:(NSDictionary*)anResponse;
 
 // Calling methods
-- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters;
-- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters withToken:(BOOL)useToken;
+- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod error:(NSError**)error;
+- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters error:(NSError**)error;
+- (NSDictionary*)dataByCallingMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters withToken:(BOOL)useToken error:(NSError**)error;
 
 // Generating urls with parameters, method name & token
+- (NSString*)urlStringWithMethod:(NSString*)aMethod;
 - (NSString*)urlStringWithMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters;
 - (NSString*)urlStringWithMethod:(NSString*)aMethod andParameters:(NSDictionary*)aParameters withToken:(BOOL)useToken;
 
